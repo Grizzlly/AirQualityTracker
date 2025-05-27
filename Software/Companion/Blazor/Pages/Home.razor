@@ -1,0 +1,146 @@
+﻿@page "/"
+@using Companion.Blazor.Components
+@using Companion.Services
+@using Shiny.BluetoothLE
+@inject BLEService BLEService
+@inject NavigationManager NavManager
+@implements IDisposable
+
+<div class="bg-gradient-to-br from-indigo-500 to-purple-600 min-h-screen flex items-center justify-center p-5">
+    <div class="bg-white/95 backdrop-blur-sm rounded-3xl p-10 text-center shadow-2xl max-w-md w-full">
+        
+        <!-- App Icon -->
+        <div class="w-20 h-20 bg-gradient-to-br from-green-500 to-green-600 rounded-2xl mx-auto mb-5 flex items-center justify-center shadow-lg shadow-green-500/30">
+            <svg class="w-10 h-10 text-white" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
+            </svg>
+        </div>
+        
+        <!-- Title and Subtitle -->
+        <h1 class="text-gray-800 text-3xl font-bold mb-3">Air Quality Monitor</h1>
+        <p class="text-gray-600 text-base mb-8 leading-relaxed">
+            Connect to your ESP32 sensor to monitor real-time air quality data and view interactive heatmaps
+        </p>
+        
+        <!-- Status Card Component -->
+        @* <StatusCard
+                   DeviceName="@_connectionStatus.DeviceName" 
+                   ErrorMessage="@_connectionStatus.ErrorMessage" /> *@
+        
+        <!-- Connect Button Component -->
+        <ConnectButton
+                      IsLoading="@_isLoading"
+                      OnConnect="@ConnectAsync"
+                      OnDisconnect="@DisconnectAsync" />
+        
+        <!-- Features List Component -->
+        @* <FeaturesList Features="@_features" /> *@
+        
+    </div>
+</div>
+
+@code {
+    // private ConnectionStatus _connectionStatus = new();
+    private bool _isLoading = false;
+    
+    private readonly List<string> _features = new()
+    {
+        "Real-time air quality monitoring",
+        "Interactive heatmap visualization", 
+        "Bluetooth Low Energy connectivity",
+        "Historical data tracking"
+    };
+
+    protected override Task OnInitializedAsync()
+    {
+        BLEService.DevicesUpdated += RefreshDevices;
+        // BluetoothService.ConnectionStatusChanged += OnConnectionStatusChanged;
+        // _connectionStatus = BluetoothService.GetConnectionStatus();
+        
+        // Check if Bluetooth is available
+        // var isAvailable = await BluetoothService.IsBluetoothAvailableAsync();
+        // if (!isAvailable)
+        // {
+        //     _connectionStatus.ErrorMessage = "Bluetooth is not available on this device";
+        //     StateHasChanged();
+        // }
+        return base.OnInitializedAsync();
+    }
+
+    private async Task ConnectAsync()
+    {
+        _isLoading = true;
+        StateHasChanged();
+        
+        try
+        {
+            bool connected = await BLEService.ConnectAsync(service_uuid);
+
+            if (!connected)
+            {
+                return;
+            }
+
+            NavManager.NavigateTo("/reader");
+        }
+        finally
+        {
+            _isLoading = false;
+            StateHasChanged();
+        }
+    }
+
+    private Task DisconnectAsync()
+    {
+        _isLoading = true;
+        StateHasChanged();
+        
+        try
+        {
+            BLEService.Stop();
+        }
+        finally
+        {
+            _isLoading = false;
+            StateHasChanged();
+        }
+
+        return Task.CompletedTask;
+    }
+
+    // private void OnConnectionStatusChanged(object? sender, ConnectionStatus status)
+    // {
+    //     _connectionStatus = status;
+    //     InvokeAsync(StateHasChanged);
+    // }
+
+    public void Dispose()
+    {
+        BLEService.DevicesUpdated -= RefreshDevices;
+    }
+}
+
+@code {
+    private string service_uuid = "8eb32be4-3f0b-4830-8a2f-6262d4e37465";
+    private List<IPeripheral> devices = [];
+
+    protected override void OnInitialized()
+    {
+        BLEService.DevicesUpdated += RefreshDevices;
+        base.OnInitialized();
+    }
+
+    void RefreshDevices()
+    {
+        MainThread.BeginInvokeOnMainThread(() =>
+        {
+            devices = BLEService.Devices.ToList();
+            StateHasChanged();
+        });
+    }
+
+    void StartScan()
+    {
+        BLEService.StartScan();
+    }
+}

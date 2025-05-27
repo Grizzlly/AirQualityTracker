@@ -1,0 +1,39 @@
+﻿@using Companion.Services
+@using Shiny.BluetoothLE
+@inject BLEService BLEService
+
+<div class="bg-gray-50 rounded-xl p-5 mb-8 border-l-4 @GetBorderColor()">
+    <div class="text-gray-600 text-sm mb-1">Connection Status</div>
+    <div class="text-lg font-semibold @GetTextColor()">@GetStatusText()</div>
+    @if (!string.IsNullOrEmpty(ErrorMessage))
+    {
+        <div class="text-red-500 text-xs mt-1">@ErrorMessage</div>
+    }
+</div>
+
+@code {
+    public ConnectionState State => BLEService.State;
+    [Parameter] public string DeviceName { get; set; } = string.Empty;
+    [Parameter] public string ErrorMessage { get; set; } = string.Empty;
+
+    private string GetBorderColor() => State switch
+    {
+        ConnectionState.Connected => "border-green-500",
+        ConnectionState.Connecting => "border-yellow-500",
+        _ => "border-red-500"
+    };
+
+    private string GetTextColor() => State switch
+    {
+        ConnectionState.Connected => "text-green-500",
+        ConnectionState.Connecting => "text-yellow-500",
+        _ => "text-red-500"
+    };
+
+    private string GetStatusText() => State switch
+    {
+        ConnectionState.Connected => $"Connected to {DeviceName}",
+        ConnectionState.Connecting => "Connecting...",
+        _ => "Disconnected"
+    };
+}

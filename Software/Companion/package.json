@@ -1,0 +1,15 @@
+{
+  "name": "companion",
+  "version": "0.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "css:build": "npx tailwindcss build -i ./wwwroot/css/site.css -o ./wwwroot/css/site.min.css",
+    "css:watch": "npx tailwindcss build -i ./wwwroot/css/site.css -o ./wwwroot/css/site.min.css --watch"
+  },
+  "keywords": [],
+  "author": "Andrei Stan",
+  "devDependencies": {
+    "tailwindcss": "^3.4.10"
+  }
+}

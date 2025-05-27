@@ -1,0 +1,229 @@
+﻿@using Companion.Services
+@using Shiny.BluetoothLE
+@implements IDisposable
+
+@inject BLEService BLEService
+@inherits LayoutComponentBase
+
+<div class="min-h-screen bg-gray-50">
+    <!-- Top Navigation Bar -->
+    <nav class="bg-white shadow-sm border-b border-gray-200">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between items-center h-16">
+                <!-- Logo and Title -->
+                <div class="flex items-center space-x-3">
+                    <div class="w-8 h-8 bg-gradient-to-br from-green-500 to-green-600 rounded-lg flex items-center justify-center">
+                        <svg class="w-5 h-5 text-white" viewBox="0 0 24 24" fill="currentColor">
+                            <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
+                        </svg>
+                    </div>
+                    <h1 class="text-xl font-semibold text-gray-900">Air Quality Monitor</h1>
+                </div>
+
+                <!-- Connection Status Indicator -->
+                <div class="flex items-center space-x-3">
+                    <div class="flex items-center space-x-2">
+                        <div class="w-2 h-2 rounded-full @GetConnectionIndicatorColor()"></div>
+                        <span class="text-sm text-gray-600 hidden sm:inline">@GetConnectionStatusText()</span>
+                    </div>
+                    
+                    <!-- Menu Button for Mobile -->
+                    <button @onclick="ToggleMobileMenu" 
+                            class="md:hidden p-2 rounded-md text-gray-400 hover:text-gray-500 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-blue-500">
+                        <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
+                        </svg>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <div class="flex">
+        <!-- Sidebar Navigation -->
+        <aside class="@GetSidebarClasses() bg-white shadow-sm border-r border-gray-200 transition-all duration-300 ease-in-out">
+            <div class="p-4">
+                <nav class="space-y-2">
+                    <NavLink href="/" class="@GetNavLinkClasses()" Match="NavLinkMatch.All">
+                        <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.111 16.404a5.5 5.5 0 017.778 0M12 20h.01m-7.08-7.071c3.904-3.905 10.236-3.905 14.141 0M1.394 9.393c5.857-5.857 15.355-5.857 21.213 0" />
+                        </svg>
+                        <span>Connect</span>
+                    </NavLink>
+
+                    <NavLink href="/dashboard" class="@GetNavLinkClasses()">
+                        <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                        </svg>
+                        <span>Dashboard</span>
+                    </NavLink>
+
+                    <NavLink href="/reader" class="@GetNavLinkClasses()">
+                        <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
+                        </svg>
+                        <span>Heatmap</span>
+                    </NavLink>
+
+                    <NavLink href="/history" class="@GetNavLinkClasses()">
+                        <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        <span>History</span>
+                    </NavLink>
+
+                    <NavLink href="/settings" class="@GetNavLinkClasses()">
+                        <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                        </svg>
+                        <span>Settings</span>
+                    </NavLink>
+                </nav>
+
+                <!-- Connection Info Card (when connected) -->
+                @if (BLEService.State == ConnectionState.Connected)
+                {
+                    <div class="mt-6 p-3 bg-green-50 rounded-lg border border-green-200">
+                        <div class="flex items-center space-x-2">
+                            <div class="w-2 h-2 bg-green-500 rounded-full"></div>
+                            <span class="text-sm font-medium text-green-800">Connected</span>
+                        </div>
+                        <p class="text-xs text-green-600 mt-1">@BLEService.Peripheral.Name</p>
+                    </div>
+                }
+            </div>
+        </aside>
+
+        <!-- Main Content Area -->
+        <main class="flex-1 min-h-screen">
+            @Body
+        </main>
+    </div>
+
+    <!-- Mobile Menu Overlay -->
+    @if (_isMobileMenuOpen)
+    {
+        <div class="fixed inset-0 z-50 md:hidden">
+            <div class="fixed inset-0 bg-black bg-opacity-50" @onclick="CloseMobileMenu"></div>
+            <div class="fixed top-0 left-0 w-64 h-full bg-white shadow-lg">
+                <div class="p-4 border-b border-gray-200">
+                    <div class="flex items-center justify-between">
+                        <h2 class="text-lg font-semibold text-gray-900">Menu</h2>
+                        <button @onclick="CloseMobileMenu" class="p-2 rounded-md text-gray-400 hover:text-gray-500">
+                            <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+                <nav class="p-4 space-y-2">
+                    <NavLink href="/" class="@GetMobileNavLinkClasses()" Match="NavLinkMatch.All" @onclick="CloseMobileMenu">
+                        <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.111 16.404a5.5 5.5 0 017.778 0M12 20h.01m-7.08-7.071c3.904-3.905 10.236-3.905 14.141 0M1.394 9.393c5.857-5.857 15.355-5.857 21.213 0" />
+                        </svg>
+                        <span>Connect</span>
+                    </NavLink>
+
+                    <NavLink href="/dashboard" class="@GetMobileNavLinkClasses()" @onclick="CloseMobileMenu">
+                        <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                        </svg>
+                        <span>Dashboard</span>
+                    </NavLink>
+
+                    <NavLink href="/reader" class="@GetMobileNavLinkClasses()" @onclick="CloseMobileMenu">
+                        <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
+                        </svg>
+                        <span>Heatmap</span>
+                    </NavLink>
+
+                    <NavLink href="/history" class="@GetMobileNavLinkClasses()" @onclick="CloseMobileMenu">
+                        <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        <span>History</span>
+                    </NavLink>
+
+                    <NavLink href="/settings" class="@GetMobileNavLinkClasses()" @onclick="CloseMobileMenu">
+                        <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                        </svg>
+                        <span>Settings</span>
+                    </NavLink>
+                </nav>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    // private ConnectionStatus _connectionStatus = new();
+    private bool _isMobileMenuOpen = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        BLEService.ConnectionStateChanged += OnConnectionStateChanged;
+        // _connectionStatus = BluetoothService.GetConnectionStatus();
+        await base.OnInitializedAsync();
+    }
+
+    private void OnConnectionStateChanged(ConnectionState state)
+    {
+        InvokeAsync(StateHasChanged);
+    }
+
+    private void ToggleMobileMenu()
+    {
+        _isMobileMenuOpen = !_isMobileMenuOpen;
+    }
+
+    private void CloseMobileMenu()
+    {
+        _isMobileMenuOpen = false;
+    }
+
+    private string GetConnectionIndicatorColor() => BLEService.State switch
+    {
+        ConnectionState.Connected => "bg-green-500",
+        ConnectionState.Connecting => "bg-yellow-500",
+        _ => "bg-red-500"
+    };
+
+    private string GetConnectionStatusText() => BLEService.State switch
+    {
+        ConnectionState.Connected => "Connected",
+        ConnectionState.Connecting => "Connecting",
+        _ => "Disconnected"
+    };
+
+    private string GetSidebarClasses()
+    {
+        return _isMobileMenuOpen 
+            ? "fixed inset-y-0 left-0 z-50 w-64 md:relative md:translate-x-0 md:w-64"
+            : "hidden md:block md:w-64";
+    }
+
+    private string GetNavLinkClasses()
+    {
+        return "flex items-center space-x-3 px-3 py-2 rounded-md text-sm font-medium transition-colors duration-200 hover:bg-gray-100 hover:text-gray-900";
+    }
+
+    private string GetMobileNavLinkClasses()
+    {
+        return "flex items-center space-x-3 px-3 py-2 rounded-md text-sm font-medium transition-colors duration-200 hover:bg-gray-100 hover:text-gray-900 w-full";
+    }
+
+    public void Dispose()
+    {
+        BLEService.ConnectionStateChanged -= OnConnectionStateChanged;
+    }
+}
+
+<style>
+    .active {
+        @@apply bg-blue-100 text-blue-700;
+    }
+</style>

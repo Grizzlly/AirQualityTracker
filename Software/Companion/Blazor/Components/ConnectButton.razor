@@ -1,0 +1,72 @@
+﻿@using Companion.Services
+@inject BLEService BLEService
+
+<button class="@GetButtonClasses() border-none rounded-xl px-8 py-4 text-lg font-semibold cursor-pointer transition-all duration-300 w-full flex items-center justify-center gap-3 @GetShadowClasses() hover:-translate-y-0.5 @GetHoverShadowClasses() active:translate-y-0"
+        @onclick="OnClickAsync"
+        disabled="@IsConnecting">
+
+    @if (IsConnecting)
+    {
+        <div class="w-5 h-5 border-2 border-transparent border-t-white rounded-full animate-spin"></div>
+        <span>Connecting...</span>
+    }
+    else if (IsConnected)
+    {
+        <svg class="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M9,20.42L2.79,14.21L5.62,11.38L9,14.77L18.88,4.88L21.71,7.71L9,20.42Z" />
+        </svg>
+        <span>Connected - Tap to Disconnect</span>
+    }
+    else
+    {
+        <svg class="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M17.71,7.71L12,2H11V9H9.41L7.71,7.29L6.29,8.71L10.59,13L6.29,17.29L7.71,18.71L9.41,17H11V24H12L17.71,18.29L14.41,15L17.71,11.71L14.41,8.5L17.71,7.71M13,5.83L15.17,8L13,10.17V5.83M13,15.83L15.17,18L13,20.17V15.83Z" />
+        </svg>
+        <span>Connect to ESP32</span>
+    }
+</button>
+
+@code {
+    [Parameter] public bool IsLoading { get; set; }
+    [Parameter] public EventCallback OnConnect { get; set; }
+    [Parameter] public EventCallback OnDisconnect { get; set; }
+
+    private bool IsConnected => BLEService.State == Shiny.BluetoothLE.ConnectionState.Connected;
+    private bool IsConnecting => BLEService.State == Shiny.BluetoothLE.ConnectionState.Connecting;
+
+    private async Task OnClickAsync()
+    {
+        if (IsConnected)
+        {
+            await OnDisconnect.InvokeAsync();
+        }
+        else if (!IsConnecting)
+        {
+            await OnConnect.InvokeAsync();
+        }
+    }
+
+    private string GetButtonClasses()
+    {
+        if (IsConnected) return "bg-gradient-to-r from-green-500 to-green-600 text-white";
+        if (IsConnecting) return "bg-gradient-to-r from-yellow-500 to-yellow-600 text-white";
+
+        return "bg-gradient-to-r from-blue-500 to-blue-600 text-white";
+    }
+
+    private string GetShadowClasses()
+    {
+        if (IsConnected) return "shadow-lg shadow-green-500/30";
+        if (IsConnecting) return "shadow-lg shadow-yellow-500/30";
+
+        return "shadow-lg shadow-blue-500/30";
+    }
+
+    private string GetHoverShadowClasses()
+    {
+        if (IsConnected) return "hover:shadow-xl hover:shadow-green-500/40";
+        if (IsConnecting) return "hover:shadow-xl hover:shadow-yellow-500/40";
+
+        return "hover:shadow-xl hover:shadow-blue-500/40";
+    }
+}

@@ -1,0 +1,107 @@
+﻿<div class="bg-white rounded-lg shadow-md p-4 text-center">
+    <div class="flex items-center justify-center mb-2">
+        <div class="w-8 h-8 @GetIconBackgroundColor() rounded-full flex items-center justify-center mr-2">
+            @((MarkupString)GetIcon())
+        </div>
+        <h3 class="text-sm font-medium text-gray-600">@Title</h3>
+    </div>
+    
+    <div class="relative w-24 h-24 mx-auto mb-2">
+        <svg class="w-24 h-24 transform -rotate-90" viewBox="0 0 100 100">
+            <!-- Background circle -->
+            <circle cx="50" cy="50" r="40" stroke="#e5e7eb" stroke-width="8" fill="none"/>
+            <!-- Progress circle -->
+            <circle cx="50" cy="50" r="40" 
+                    stroke="@GetProgressColor()" 
+                    stroke-width="8" 
+                    fill="none"
+                    stroke-dasharray="@GetDashArray()"
+                    stroke-dashoffset="@GetDashOffset()"
+                    stroke-linecap="round"
+                    class="transition-all duration-500 ease-in-out"/>
+        </svg>
+        <div class="absolute inset-0 flex items-center justify-center">
+            <div class="text-center">
+                <div class="text-lg font-bold @GetValueColor()">@FormattedValue</div>
+                <div class="text-xs text-gray-500">@Unit</div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="text-xs @GetStatusColor() font-medium">@GetStatus()</div>
+</div>
+
+@code {
+    [Parameter] public string Title { get; set; } = "Sensor Gauge";
+    [Parameter] public double Value { get; set; } = 0;
+    [Parameter] public double MinValue { get; set; } = 0;
+    [Parameter] public double MaxValue { get; set; } = 100;
+    [Parameter] public string Unit { get; set; } = "°C";
+    [Parameter] public SensorType TType { get; set; } = SensorType.Temperature;
+
+    public enum SensorType
+    {
+        Temperature,
+        Humidity,
+        Pressure,
+        GasResistance,
+        AirQuality
+    }
+
+    private string FormattedValue => TType switch
+    {
+        SensorType.Temperature => $"{Value:F1}",
+        SensorType.Humidity => $"{Value:F0}",
+        SensorType.Pressure => $"{Value:F0}",
+        SensorType.GasResistance => $"{Value:F0}",
+        SensorType.AirQuality => $"{Value:F0}",
+        _ => $"{Value:F1}"
+    };
+
+    private double GetPercentage()
+    {
+        if (MaxValue <= MinValue) return 0;
+        var percentage = ((Value - MinValue) / (MaxValue - MinValue)) * 100;
+        return Math.Max(0, Math.Min(100, percentage));
+    }
+
+    private string GetDashArray()
+    {
+        var circumference = 2 * Math.PI * 40;
+        return $"{circumference} {circumference}";
+    }
+
+    private string GetDashOffset()
+    {
+        var circumference = 2 * Math.PI * 40;
+        var offset = circumference - (GetPercentage() / 100 * circumference);
+        return offset.ToString("F2");
+    }
+
+
+    private string GetValueColor() => GetProgressColor().Replace("#", "text-") switch
+    {
+        "text-3b82f6" => "text-blue-600",
+        "text-10b981" => "text-green-600",
+        "text-f59e0b" => "text-yellow-600",
+        "text-ef4444" => "text-red-600",
+        "text-8b5cf6" => "text-purple-600",
+        "text-06b6d4" => "text-cyan-600",
+        "text-f97316" => "text-orange-600",
+        _ => "text-gray-600"
+    };
+
+    private string GetStatusColor() => GetValueColor();
+
+    private string GetIconBackgroundColor() => GetValueColor().Replace("text-", "bg-").Replace("-600", "-100");
+
+    private string GetIcon() => TType switch
+    {
+        SensorType.Temperature => "<svg class='w-4 h-4 text-current' fill='none' viewBox='0 0 24 24' stroke='currentColor'><path stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M9 19V6l6-6v13a6 6 0 11-6 6z'/></svg>",
+        SensorType.Humidity => "<svg class='w-4 h-4 text-current' fill='none' viewBox='0 0 24 24' stroke='currentColor'><path stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M3 15a4 4 0 004 4h9a5 5 0 10-.1-9.999 5.002 5.002 0 10-9.78 2.096A4.001 4.001 0 003 15z'/></svg>",
+        SensorType.Pressure => "<svg class='w-4 h-4 text-current' fill='none' viewBox='0 0 24 24' stroke='currentColor'><path stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M13 10V3L4 14h7v7l9-11h-7z'/></svg>",
+        SensorType.GasResistance => "<svg class='w-4 h-4 text-current' fill='none' viewBox='0 0 24 24' stroke='currentColor'><path stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M7 4V2a1 1 0 011-1h8a1 1 0 011 1v2m-9 0h10m-10 0l1 16h8l1-16'/></svg>",
+        SensorType.AirQuality => "<svg class='w-4 h-4 text-current' fill='none' viewBox='0 0 24 24' stroke='currentColor'><path stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z'/></svg>",
+        _ => "<svg class='w-4 h-4 text-current' fill='none' viewBox='0 0 24 24' stroke='currentColor'><path stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z'/></svg>"
+    };
+}

@@ -1,0 +1,304 @@
+﻿@page "/reader"
+@using Companion.Blazor.Components
+@using Companion.Services
+@using System.Diagnostics
+@inject BLEService BLEService
+@inject LocationService LocationService
+@inject NavigationManager NavManager
+@inject IJSRuntime JS
+@implements IDisposable
+
+<PageTitle>Air Quality Reader</PageTitle>
+
+<div class="min-h-screen bg-gray-50">
+    <!-- Header -->
+    <div class="bg-white shadow-sm border-b border-gray-200 p-4">
+        <div class="flex items-center justify-between">
+            <div class="flex items-center space-x-3">
+                <button @onclick="Back" class="p-2 rounded-md text-gray-400 hover:text-gray-500 hover:bg-gray-100">
+                    <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
+                    </svg>
+                </button>
+                <h1 class="text-xl font-semibold text-gray-900">Air Quality Reader</h1>
+            </div>
+            <div class="flex items-center space-x-2">
+                <div class="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+                <span class="text-sm text-gray-600">Live</span>
+            </div>
+        </div>
+    </div>
+
+    <div class="p-4 space-y-6">
+        <!-- Sensor Gauges Grid -->
+        <div class="grid grid-cols-2 lg:grid-cols-5 gap-4">
+            <SensorGauge Title="Temperature" 
+                        Value="@_currentReading.Temperature" 
+                        MinValue="-10" 
+                        MaxValue="50" 
+                        Unit="°C" 
+                        TType="SensorGauge.SensorType.Temperature" />
+            
+            <SensorGauge Title="Humidity" 
+                        Value="@_currentReading.Humidity" 
+                        MinValue="0" 
+                        MaxValue="100" 
+                        Unit="%" 
+                        TType="SensorGauge.SensorType.Humidity" />
+            
+            <SensorGauge Title="Pressure" 
+                        Value="@_currentReading.Pressure" 
+                        MinValue="950" 
+                        MaxValue="1050" 
+                        Unit="hPa" 
+                        TType="SensorGauge.SensorType.Pressure" />
+            
+            <SensorGauge Title="Gas Resistance" 
+                        Value="@_currentReading.GasResistance" 
+                        MinValue="0" 
+                        MaxValue="500000" 
+                        Unit="Ω" 
+                        TType="SensorGauge.SensorType.GasResistance" />
+            
+            <SensorGauge Title="Air Quality" 
+                        Value="@_currentReading.AirQualityIndex" 
+                        MinValue="0" 
+                        MaxValue="500" 
+                        Unit="AQI" 
+                        TType="SensorGauge.SensorType.AirQuality" />
+        </div>
+
+        <!-- Location Info -->
+        @if (_currentLocation != null)
+        {
+            <div class="bg-white rounded-lg shadow p-4">
+                <div class="flex items-center space-x-2 mb-2">
+                    <svg class="w-5 h-5 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                    </svg>
+                    <h3 class="text-sm font-medium text-gray-900">Current Location</h3>
+                </div>
+                <p class="text-sm text-gray-600">
+                    Lat: @_currentLocation.Latitude.ToString("F6"), 
+                    Lng: @_currentLocation.Longitude.ToString("F6")
+                </p>
+                <p class="text-xs text-gray-500 mt-1">
+                    Accuracy: ±@(_currentLocation.Accuracy?.ToString("F0") ?? "Unknown")m
+                </p>
+            </div>
+        }
+
+        <!-- Map Container -->
+        <div class="bg-white rounded-lg shadow overflow-hidden">
+            <div class="p-4 border-b border-gray-200">
+                <h2 class="text-lg font-semibold text-gray-900">Air Quality Heatmap</h2>
+                <p class="text-sm text-gray-600">Real-time air quality visualization</p>
+            </div>
+            <div id="readerMap" class="w-full h-96"></div>
+        </div>
+
+        <!-- Data Statistics -->
+        <div class="bg-white rounded-lg shadow p-4">
+            <h3 class="text-lg font-semibold text-gray-900 mb-4">Session Statistics</h3>
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div class="text-center">
+                    <p class="text-2xl font-bold text-blue-600">@_readingCount</p>
+                    <p class="text-sm text-gray-600">Readings</p>
+                </div>
+                <div class="text-center">
+                    <p class="text-2xl font-bold text-green-600">@_sessionDuration.ToString(@"mm\:ss")</p>
+                    <p class="text-sm text-gray-600">Duration</p>
+                </div>
+                <div class="text-center">
+                    <p class="text-2xl font-bold text-purple-600">@(_sensorReadings.Count > 0 ? _sensorReadings.Average(r => r.AirQualityIndex).ToString("F0") : "0")</p>
+                    <p class="text-sm text-gray-600">Avg AQI</p>
+                </div>
+                <div class="text-center">
+                    <p class="text-2xl font-bold text-orange-600">@(_sensorReadings.Count > 0 ? _sensorReadings.Max(r => r.AirQualityIndex).ToString("F0") : "0")</p>
+                    <p class="text-sm text-gray-600">Max AQI</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    private const string TempCharUUID = "af8a2be6-71c5-4ae4-bbd2-a94f9792a4ec";
+    private const string HumidityCharUUID = "e242d07e-eefc-4c70-b27f-7e3e63f63b78";
+    private const string PressureCharUUID = "16175616-eaad-4208-be2c-f5bbddd512b5";
+    private const string GasCharUUID = "b8f3a0c4-5d1e-4b2c-9f6d-7a2e5f3b8c7d";
+    private const string ServiceUUID = "8eb32be4-3f0b-4830-8a2f-6262d4e37465";
+
+    private SensorReading _currentReading = new();
+    private Location? _currentLocation;
+    private Task locationRequestTask;
+    private List<SensorReading> _sensorReadings = new();
+    private int _readingCount = 0;
+    private DateTime _sessionStart = DateTime.Now;
+    private TimeSpan _sessionDuration => DateTime.Now - _sessionStart;
+    bool mapInitialized = false;
+
+    private CancellationTokenSource _cancellationTokenSource = new();
+    private IJSObjectReference? _jsMap;
+
+    public Reader()
+    {
+        locationRequestTask = RequestLocationPermission();
+        locationRequestTask = locationRequestTask.ContinueWith(_ => GetCurrentLocation(), TaskScheduler.FromCurrentSynchronizationContext());
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        await locationRequestTask;
+        StartReadingLoop();
+        await base.OnInitializedAsync();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender && !mapInitialized)
+        {
+            if (_jsMap != null && _currentLocation != null)
+            {
+                Debug.WriteLine($"Initializing map at {_currentLocation.Latitude}, {_currentLocation.Longitude}");
+                await _jsMap.InvokeVoidAsync("initMap", _currentLocation.Latitude, _currentLocation.Longitude);
+                mapInitialized = true;
+            }
+        }
+        if (firstRender)
+        {
+            _jsMap = await JS.InvokeAsync<IJSObjectReference>("import", "./Blazor/Pages/Reader.razor.js");
+        }
+        await base.OnAfterRenderAsync(firstRender);
+    }
+
+    private async Task RequestLocationPermission()
+    {
+        try
+        {
+            await LocationService.RequestLocationPermissionAsync();
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"Error requesting location permission: {ex.Message}");
+        }
+    }
+
+    private async Task GetCurrentLocation()
+    {
+        try
+        {
+            _currentLocation = await LocationService.GetCurrentLocationAsync();
+            if (_currentLocation != null)
+            {
+                _currentReading.Latitude = _currentLocation.Latitude;
+                _currentReading.Longitude = _currentLocation.Longitude;
+                MainThread.BeginInvokeOnMainThread(StateHasChanged);
+            }
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"Error getting location: {ex.Message}");
+        }
+    }
+
+    private void StartReadingLoop()
+    {
+        var token = _cancellationTokenSource.Token;
+        _ = Task.Run(async () =>
+        {
+            while (!token.IsCancellationRequested)
+            {
+                try
+                {
+                    // Read all characteristics
+                    var humData = await BLEService.ReadCharacteristicAsync(ServiceUUID, HumidityCharUUID);
+                    var tempData = await BLEService.ReadCharacteristicAsync(ServiceUUID, TempCharUUID);
+                    var pressureData = await BLEService.ReadCharacteristicAsync(ServiceUUID, PressureCharUUID);
+                    var gasData = await BLEService.ReadCharacteristicAsync(ServiceUUID, GasCharUUID);
+
+                    // Update current reading
+                    _currentReading.Humidity = BitConverter.ToInt16(humData.Data);
+                    _currentReading.Temperature = BitConverter.ToInt16(tempData.Data);
+                    _currentReading.Pressure = BitConverter.ToInt16(pressureData.Data);
+                    _currentReading.GasResistance = BitConverter.ToInt16(gasData.Data);
+
+                    // Calculate Air Quality Index (simplified calculation)
+                    _currentReading.AirQualityIndex = CalculateAQI(_currentReading);
+                    _currentReading.Timestamp = DateTime.Now;
+
+                    // Add to readings list
+                    var readingCopy = new SensorReading
+                    {
+                        Timestamp = _currentReading.Timestamp,
+                        Latitude = _currentReading.Latitude,
+                        Longitude = _currentReading.Longitude,
+                        Temperature = _currentReading.Temperature,
+                        Humidity = _currentReading.Humidity,
+                        Pressure = _currentReading.Pressure,
+                        GasResistance = _currentReading.GasResistance,
+                        AirQualityIndex = _currentReading.AirQualityIndex
+                    };
+
+                    _sensorReadings.Add(readingCopy);
+                    _readingCount++;
+
+                    // Update map with new data point
+                    if (mapInitialized)
+                    {
+                        await _jsMap!.InvokeVoidAsync("addDataPoint",
+                            _currentLocation!.Latitude,
+                            _currentLocation!.Longitude,
+                            _currentReading.AirQualityIndex,
+                            _currentReading.GetAirQualityColor());
+                    }
+
+                    MainThread.BeginInvokeOnMainThread(() =>
+                    {
+                        StateHasChanged();
+                    });
+                }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine($"Error reading sensor data: {ex.Message}");
+                }
+
+                await Task.Delay(2000, token); // Read every 2 seconds
+            }
+        }, token);
+    }
+
+    private int CalculateAQI(SensorReading reading)
+    {
+        // Simplified AQI calculation based on gas resistance and humidity
+        // In a real implementation, you'd use proper AQI formulas
+
+        var gasScore = reading.GasResistance switch
+        {
+            > 20000 => 25,  // Excellent
+            > 10000 => 50,  // Good
+            > 5000 => 100,  // Moderate
+            > 2500 => 150,  // Unhealthy for sensitive
+            > 1000 => 200,  // Unhealthy
+            _ => 300         // Very unhealthy
+        };
+
+        var humidityScore = Math.Abs(reading.Humidity - 45) * 2; // Optimal humidity around 45%
+
+        return Math.Min(500, (int)(gasScore + humidityScore * 0.3));
+    }
+
+    private void Back()
+    {
+        _cancellationTokenSource.Cancel();
+        BLEService.Stop();
+        NavManager.NavigateTo("/");
+    }
+
+    public void Dispose()
+    {
+        _cancellationTokenSource.Cancel();
+        _jsMap?.DisposeAsync();
+    }
+}
